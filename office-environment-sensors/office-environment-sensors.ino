@@ -9,8 +9,11 @@
   controller. The controller then forwards that information to an InfluxDB
   instance for collection and vizualization.
 
-  The library used in this example can be found here:
+  The Shield library used in this example can be found here:
   https://github.com/sparkfun/SparkFun_Photon_Weather_Shield_Particle_Library
+
+  The MQTT library can be found here:
+  https://github.com/hirotakaster/MQTT
 
   Hardware Connections:
 	This sketch was written specifically for the Photon Weather Shield,
@@ -35,6 +38,14 @@
                        SparkFun Photon Weather Shield
 *******************************************************************************/
 #include "SparkFun_Photon_Weather_Shield_Library.h"
+#include "MQTT.h"
+
+// Configure MQTT Server
+byte server[] = { 10, 171, 5, 102 }; //Replace with local network MQTT Server
+
+ MQTT client(server, 1883, mqtt_callback);
+// If you want to use domain name or server name,
+// MQTT client("www.sample.com", 1883, callback)
 
 float humidity = 0;
 float tempf = 0;
@@ -49,14 +60,10 @@ Weather sensor;
 //---------------------------------------------------------------
 void setup()
 {
-    Particle.publish("Init");
-
     Serial.begin(9600);   // open serial over USB at 9600 baud
 
     sensor.begin();
-
     sensor.setModeBarometer();//Set to Barometer Mode
-
     //These are additional MPL3115A2 functions that MUST be called for the sensor to work.
     sensor.setOversampleRate(7); // Set Oversample rate
     //Call with a rate from 0 to 7. See page 33 for table of ratios.
@@ -64,10 +71,25 @@ void setup()
     //from 1 to 128 samples. The higher the oversample rate the greater
     //the time between data samples.
 
-
     sensor.enableEventFlags(); //Necessary register calls to enble temp, baro and alt
+
+    //Init MQTT client
+    //connect to the server
+    client.connect("Home_Office_Client");
 }
 //---------------------------------------------------------------
+
+void mqtt_callback(char* topic, byte* payload, unsigned int length)
+{
+    char p[length + 1];
+    memcpy(p, payload, length);
+    p[length] = NULL;
+    String message(p);
+
+    Serial.println("Ack: ");
+    Serial.println(message);
+}
+
 void loop()
 {
       if(millis() - lastPrint > 5000)
@@ -77,7 +99,7 @@ void loop()
 
         getWeather();
 
-        //logInfo(); //Log to NodeRed
+        logWeather(); //Log to NodeRed
         printInfo(); //Print to Serial
       }
 }
@@ -103,11 +125,34 @@ void getWeather()
   //float altf = sensor.readAltitudeFt();
 }
 //---------------------------------------------------------------
+
+void logWeather()
+{
+  Serial.print("Connected: ");
+  Serial.println(client.isConnected());
+
+  if (client.isConnected()) {
+        // get messageid parameter at 4.
+        uint16_t messageid;
+
+        // string of concatenated environmentalValues
+        String values = "{\"environment\": \"office\", \"temp\": " + String(tempf) + ", \"humidity\": " + String(humidity) + ", \"baro\": " + String(baroTemp) + ", \"pressure\": " + String(pascals/100) + "}";
+
+        client.publish("/environment", values, MQTT::QOS1, &messageid);
+
+        Serial.print("MessageId: ");
+        Serial.println(messageid);
+
+        client.subscribe("/environment_ack");
+    } else {
+      //Try to reconnect
+      client.connect("Home_Office_Client");
+    }
+}
+
 void printInfo()
 {
 //This function prints the weather data out to the default Serial Port
-
-  Particle.publish("Temp", String(tempf));
 
   Serial.print("Temp:");
   Serial.print(tempf);
@@ -123,14 +168,5 @@ void printInfo()
 
   Serial.print("Pressure:");
   Serial.print(pascals/100);
-  Serial.print("hPa, ");
-  Serial.print((pascals/100) * 0.0295300);
-  Serial.println("in.Hg");
-  //The MPL3115A2 outputs the pressure in Pascals. However, most weather stations
-  //report pressure in hectopascals or millibars. Divide by 100 to get a reading
-  //more closely resembling what online weather reports may say in hPa or mb.
-  //Another common unit for pressure is Inches of Mercury (in.Hg). To convert
-  //from mb to in.Hg, use the following formula. P(inHg) = 0.0295300 * P(mb)
-  //More info on conversion can be found here:
-  //www.srh.noaa.gov/images/epz/wxcalc/pressureConversion.pdf
+  Serial.println("hPa");
 }
