@@ -45,7 +45,7 @@ byte server[] = { 10, 171, 5, 102 }; //Replace with local network MQTT Server
 
  MQTT client(server, 1883, mqtt_callback);
 // If you want to use domain name or server name,
-// MQTT client("www.sample.com", 1883, callback)
+// MQTT client("www.sample.com", 1883, callback)git statu
 
 float humidity = 0;
 float tempf = 0;
