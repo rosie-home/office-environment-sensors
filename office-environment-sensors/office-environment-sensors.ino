@@ -92,7 +92,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length)
 
 void loop()
 {
-      if(millis() - lastPrint > 5000)
+      if(millis() - lastPrint > 30000)
       {
         // Record when you published
         lastPrint = millis();
@@ -131,23 +131,25 @@ void logWeather()
   Serial.print("Connected: ");
   Serial.println(client.isConnected());
 
+
+  if(!client.isConnected()) {
+    client.connect("Home_Office_Client");
+  }
+
   if (client.isConnected()) {
-        // get messageid parameter at 4.
-        uint16_t messageid;
+    // get messageid parameter at 4.
+    uint16_t messageid;
 
-        // string of concatenated environmentalValues
-        String values = "{\"environment\": \"office\", \"temp\": " + String(tempf) + ", \"humidity\": " + String(humidity) + ", \"baro\": " + String(baroTemp) + ", \"pressure\": " + String(pascals/100) + "}";
+    // string of concatenated environmentalValues
+    String values = "{\"environment\": \"office\", \"temp\": " + String(tempf) + ", \"humidity\": " + String(humidity) + ", \"baro\": " + String(baroTemp) + ", \"pressure\": " + String(pascals/100) + "}";
 
-        client.publish("/environment", values, MQTT::QOS1, &messageid);
+    client.publish("/environment", values, MQTT::QOS1, &messageid);
 
-        Serial.print("MessageId: ");
-        Serial.println(messageid);
+    Serial.print("MessageId: ");
+    Serial.println(messageid);
 
-        client.subscribe("/environment_ack");
-    } else {
-      //Try to reconnect
-      client.connect("Home_Office_Client");
-    }
+    client.disconnect();
+  }
 }
 
 void printInfo()
